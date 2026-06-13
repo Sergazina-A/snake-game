@@ -1,0 +1,184 @@
+<!DOCTYPE html><!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Змейка</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:#f5f5f3;font-family:sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh}
+    #gw{display:flex;flex-direction:column;align-items:center;padding:2rem;gap:1rem}
+    h1{font-size:22px;font-weight:500;color:#111}
+    #topbar{display:flex;gap:1.5rem;font-size:13px;color:#888;align-items:center}
+    #topbar span{font-size:18px;font-weight:500;color:#111}
+    #lvlbadge{background:#EAF3DE;color:#27500A;font-size:12px;font-weight:500;padding:3px 10px;border-radius:20px}
+    #applebelt{display:flex;gap:4px;align-items:center}
+    #msg{font-size:13px;color:#888;min-height:20px;text-align:center}
+    .brow{display:flex;gap:8px}
+    button{padding:8px 20px;border:1px solid #ddd;background:#fff;color:#111;border-radius:8px;cursor:pointer;font-size:13px}
+    button:hover{background:#f0f0f0}
+    .dp{display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(3,44px);gap:4px}
+    .dp button{width:44px;height:44px;padding:0;font-size:18px}
+    #wrap{border-radius:12px;overflow:hidden;border:3px solid #3B6D11;box-shadow:0 0 0 5px #639922,0 0 0 8px #3B6D11}
+    canvas{display:block}
+  </style>
+</head>
+<body>
+<div id="gw">
+  <h1>Змейка</h1>
+  <div id="topbar">
+    <div>Счёт: <span id="sc">0</span></div>
+    <div id="lvlbadge">Уровень 1</div>
+    <div>Рекорд: <span id="bs">0</span></div>
+  </div>
+  <div id="applebelt"></div>
+  <div id="wrap"><canvas id="c" width="360" height="360"></canvas></div>
+  <div id="msg">Нажми «Старт» или пробел</div>
+  <div class="brow"><button id="sBtn">Старт</button><button id="pBtn">Пауза</button></div>
+  <div class="dp">
+    <div></div><button data-d="UP">↑</button><div></div>
+    <button data-d="LEFT">←</button><div></div><button data-d="RIGHT">→</button>
+    <div></div><button data-d="DOWN">↓</button><div></div>
+  </div>
+</div>
+<script>
+const COLS=18,ROWS=18,CELL=20;
+const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+const APPLES_PER_LEVEL=5,BASE_SPEED=250,SPEED_STEP=15;
+let snake,dir,nd,food,score,best=0,level,applesOnLevel,running=false,paused=false,loop;
+
+function getSpeed(){return Math.max(60,BASE_SPEED-(level-1)*SPEED_STEP);}
+
+function resetSnake(){
+  snake=[{x:9,y:9},{x:8,y:9},{x:7,y:9}];
+  dir={x:1,y:0};nd={x:1,y:0};
+}
+
+function start(){
+  resetSnake();
+  score=0;level=1;applesOnLevel=0;
+  upUI();placeFood();
+  running=true;paused=false;
+  clearInterval(loop);loop=setInterval(tick,getSpeed());
+  document.getElementById('msg').textContent='Стрелки или WASD · каждые 5 яблок — новый уровень';
+}
+
+function nextLevel(){
+  level++;applesOnLevel=0;
+  resetSnake();
+  clearInterval(loop);loop=setInterval(tick,getSpeed());
+  upUI();placeFood();
+  document.getElementById('msg').textContent='Уровень '+level+'! Змейка сброшена, скорость выросла!';
+  setTimeout(()=>{if(running&&!paused)document.getElementById('msg').textContent='';},1800);
+}
+
+function placeFood(){
+  let p;
+  do{p={x:Math.floor(Math.random()*COLS),y:Math.floor(Math.random()*ROWS)};}
+  while(snake.some(s=>s.x===p.x&&s.y===p.y));
+  food=p;
+}
+
+function tick(){
+  dir=nd;
+  const h={x:snake[0].x+dir.x,y:snake[0].y+dir.y};
+  if(h.x<0||h.x>=COLS||h.y<0||h.y>=ROWS||snake.some(s=>s.x===h.x&&s.y===h.y)){end();return;}
+  snake.unshift(h);
+  if(h.x===food.x&&h.y===food.y){
+    score++;applesOnLevel++;
+    if(score>best)best=score;
+    upUI();
+    if(applesOnLevel>=APPLES_PER_LEVEL){nextLevel();return;}
+    placeFood();
+  } else {
+    snake.pop();
+  }
+  draw();
+}
+
+function end(){
+  clearInterval(loop);running=false;draw();
+  document.getElementById('msg').textContent='Игра окончена! Счёт: '+score+' · Уровень: '+level;
+}
+
+function upUI(){
+  document.getElementById('sc').textContent=score;
+  document.getElementById('bs').textContent=best;
+  document.getElementById('lvlbadge').textContent='Уровень '+level;
+  const belt=document.getElementById('applebelt');
+  belt.innerHTML='';
+  for(let i=0;i<APPLES_PER_LEVEL;i++){
+    const d=document.createElement('div');
+    d.style.cssText='width:14px;height:14px;border-radius:50%;background:'+(i<applesOnLevel?'#e0322b':'#ddd')+';transition:background 0.2s';
+    belt.appendChild(d);
+  }
+}
+
+function drawApple(x,y){
+  const cx=x*CELL+CELL/2,cy=y*CELL+CELL/2,r=CELL/2-2;
+  ctx.fillStyle='#e0322b';
+  ctx.beginPath();ctx.arc(cx,cy+1,r,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#27500A';ctx.fillRect(cx-1,cy-r-3,2,5);
+  ctx.strokeStyle='#5DCAA5';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(cx+1,cy-r-1);ctx.quadraticCurveTo(cx+6,cy-r-4,cx+5,cy-r+2);ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,0.25)';
+  ctx.beginPath();ctx.ellipse(cx-2,cy-2,3,4,Math.PI/4,0,Math.PI*2);ctx.fill();
+}
+
+function drawCheckerboard(){
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    ctx.fillStyle=(r+c)%2===0?'#EAF3DE':'#C0DD97';
+    ctx.fillRect(c*CELL,r*CELL,CELL,CELL);
+  }
+}
+
+function draw(){
+  ctx.clearRect(0,0,cv.width,cv.height);
+  drawCheckerboard();
+  snake.forEach((seg,i)=>{
+    if(i===0){
+      ctx.fillStyle='#27500A';
+      ctx.beginPath();ctx.roundRect(seg.x*CELL+1,seg.y*CELL+1,CELL-2,CELL-2,5);ctx.fill();
+      ctx.fillStyle='white';
+      const ex=seg.x*CELL,ey=seg.y*CELL;
+      if(dir.x===1){ctx.beginPath();ctx.arc(ex+14,ey+6,2.5,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(ex+14,ey+14,2.5,0,Math.PI*2);ctx.fill();}
+      else if(dir.x===-1){ctx.beginPath();ctx.arc(ex+6,ey+6,2.5,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(ex+6,ey+14,2.5,0,Math.PI*2);ctx.fill();}
+      else if(dir.y===-1){ctx.beginPath();ctx.arc(ex+6,ey+6,2.5,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(ex+14,ey+6,2.5,0,Math.PI*2);ctx.fill();}
+      else{ctx.beginPath();ctx.arc(ex+6,ey+14,2.5,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(ex+14,ey+14,2.5,0,Math.PI*2);ctx.fill();}
+    } else {
+      ctx.fillStyle=i%2===0?'#639922':'#3B6D11';
+      ctx.beginPath();ctx.roundRect(seg.x*CELL+2,seg.y*CELL+2,CELL-4,CELL-4,4);ctx.fill();
+    }
+  });
+  drawApple(food.x,food.y);
+}
+
+function drawIdle(){
+  drawCheckerboard();
+  ctx.fillStyle='rgba(0,0,0,0.22)';ctx.font='bold 15px sans-serif';ctx.textAlign='center';
+  ctx.fillText('Нажми Старт',cv.width/2,cv.height/2);ctx.textAlign='start';
+}
+drawIdle();
+upUI();
+
+document.getElementById('sBtn').addEventListener('click',start);
+document.getElementById('pBtn').addEventListener('click',()=>{
+  if(!running)return;paused=!paused;
+  if(paused){clearInterval(loop);document.getElementById('msg').textContent='Пауза';}
+  else{loop=setInterval(tick,getSpeed());document.getElementById('msg').textContent='';}
+});
+document.querySelectorAll('.dp button[data-d]').forEach(b=>b.addEventListener('click',()=>setDir(b.dataset.d)));
+function setDir(d){
+  if(d==='UP'&&dir.y!==1)nd={x:0,y:-1};
+  if(d==='DOWN'&&dir.y!==-1)nd={x:0,y:1};
+  if(d==='LEFT'&&dir.x!==1)nd={x:-1,y:0};
+  if(d==='RIGHT'&&dir.x!==-1)nd={x:1,y:0};
+}
+document.addEventListener('keydown',e=>{
+  const m={ArrowUp:'UP',ArrowDown:'DOWN',ArrowLeft:'LEFT',ArrowRight:'RIGHT',KeyW:'UP',KeyS:'DOWN',KeyA:'LEFT',KeyD:'RIGHT'};
+  if(m[e.code]){e.preventDefault();setDir(m[e.code]);}
+  if(e.code==='Space'){if(!running)start();else document.getElementById('pBtn').click();}
+});
+</script>
+</body>
+</html>
